@@ -104,6 +104,17 @@ else
     log "No Blender tarball found in BLENDER_APPS/. Upload one to the VPS first."
 fi
 
+# ── 6b. Replace Blender's bundled Vulkan loader with our system 1.3 build ──
+# Blender ships libvulkan.so.1.3.296 in its lib/ dir but it's missing symbols.
+# Our system-built /usr/local/lib/libvulkan.so.1.3.283 works correctly.
+if [ -d /workspace/BLENDER_APPS/blender-app/lib ]; then
+    log "Replacing Blender's bundled Vulkan loader with system Vulkan 1.3..."
+    rm -f /workspace/BLENDER_APPS/blender-app/lib/libvulkan.so*
+    ln -s /usr/local/lib/libvulkan.so.1.3.283 /workspace/BLENDER_APPS/blender-app/lib/libvulkan.so.1.3.283
+    ln -s libvulkan.so.1.3.283 /workspace/BLENDER_APPS/blender-app/lib/libvulkan.so.1
+    ln -s libvulkan.so.1.3.283 /workspace/BLENDER_APPS/blender-app/lib/libvulkan.so
+fi
+
 # Ensure kasm-user owns everything after extraction
 chown -R kasm-user:kasm-user /workspace
 
