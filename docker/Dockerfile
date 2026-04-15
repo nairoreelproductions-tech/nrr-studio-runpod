@@ -27,8 +27,9 @@ RUN cd /tmp \
     && ldconfig \
     && rm -rf /tmp/Vulkan-Headers /tmp/Vulkan-Loader
 
-# Blender launcher wrapper — uses VirtualGL for GPU acceleration in KasmVNC
+# Blender launcher wrapper — preloads Vulkan 1.3 + uses VirtualGL for KasmVNC
 RUN printf '#!/usr/bin/env bash\n\
+export LD_PRELOAD=/usr/local/lib/libvulkan.so.1.3.283\n\
 if [ -f /opt/VirtualGL/bin/vglrun ] && [ ! -z "${KASM_EGL_CARD}" ] && [ ! -z "${KASM_RENDERD}" ] && [ -O "${KASM_RENDERD}" ] && [ -O "${KASM_EGL_CARD}" ]; then\n\
     vglrun -d "${KASM_EGL_CARD}" /workspace/BLENDER_APPS/blender-app/blender "$@"\n\
 else\n\
