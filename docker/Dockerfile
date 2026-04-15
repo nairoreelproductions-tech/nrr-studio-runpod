@@ -34,10 +34,19 @@ RUN cd /tmp \
 # ── DIAG: confirm base OS version ──
 RUN echo "=== OS VERSION ===" && cat /etc/os-release
 
-# ── DIAG: install Tailscale using official installer (auto-detects OS) ──
-RUN curl -fsSL https://tailscale.com/install.sh | sh \
-    && echo "Tailscale version:" && tailscale version \
-    && mkdir -p /var/run/tailscale /var/lib/tailscale
+# ── DIAG: install Tailscale via static binary (bypasses apt entirely) ──
+RUN set -e \
+    && TSVERSION=$(curl -fsSL 'https://pkgs.tailscale.com/stable/?mode=json' \
+         | grep -o '"Version":"[^"]*"' | head -1 | cut -d'"' -f4) \
+    && echo "Installing Tailscale static binary v${TSVERSION}..." \
+    && curl -fsSL "https://pkgs.tailscale.com/stable/tailscale_${TSVERSION}_amd64.tgz" \
+         -o /tmp/tailscale.tgz \
+    && tar xzf /tmp/tailscale.tgz -C /tmp \
+    && install -m 755 "/tmp/tailscale_${TSVERSION}_amd64/tailscale" /usr/local/bin/ \
+    && install -m 755 "/tmp/tailscale_${TSVERSION}_amd64/tailscaled" /usr/local/bin/ \
+    && rm -rf /tmp/tailscale* \
+    && mkdir -p /var/run/tailscale /var/lib/tailscale \
+    && echo "Tailscale version:" && tailscale version
 
 # ── DIAG: install Sunshine deps + attempt .deb install ──
 # We try multiple URL patterns since LizardByte naming varies by release.
