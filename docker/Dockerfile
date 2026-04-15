@@ -27,6 +27,74 @@ RUN cd /tmp \
     && ldconfig \
     && rm -rf /tmp/Vulkan-Headers /tmp/Vulkan-Loader
 
+# ══════════════════════════════════════════════════════════════
+# DIAGNOSTIC BUILD — Phase 1: answer unknowns before full build
+# ══════════════════════════════════════════════════════════════
+
+# ── DIAG: confirm base OS version ──
+RUN echo "=== OS VERSION ===" && cat /etc/os-release
+
+# ── DIAG: install Tailscale using detected OS codename ──
+RUN . /etc/os-release && echo "Detected codename: ${VERSION_CODENAME}" \
+    && curl -fsSL "https://pkgs.tailscale.com/stable/ubuntu/${VERSION_CODENAME}.noarmor.gpg" \
+         | tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null \
+    && curl -fsSL "https://pkgs.tailscale.com/stable/ubuntu/${VERSION_CODENAME}.tailscale-keyring.list" \
+         | tee /etc/apt/sources.list.d/tailscale.list \
+    && apt-get update && apt-get install -y --no-install-recommends tailscale \
+    && echo "Tailscale version:" && tailscale version \
+    && mkdir -p /var/run/tailscale /var/lib/tailscale \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── DIAG: install Sunshine deps + attempt .deb install ──
+# We try multiple URL patterns since LizardByte naming varies by release.
+# This step is fault-tolerant — if Sunshine fails, the build still completes.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libevdev-dev libcap-dev libdrm-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN . /etc/os-release \
+    && echo "=== SUNSHINE INSTALL ATTEMPT ===" \
+    && echo "Trying sunshine-${VERSION_CODENAME}-amd64.deb ..." \
+    && (curl -fSL -o /tmp/sunshine.deb \
+         "https://github.com/LizardByte/Sunshine/releases/latest/download/sunshine-${VERSION_CODENAME}-amd64.deb" \
+         2>/dev/null \
+       || curl -fSL -o /tmp/sunshine.deb \
+         "https://github.com/LizardByte/Sunshine/releases/latest/download/sunshine-ubuntu-${VERSION_ID}-amd64.deb" \
+         2>/dev/null \
+       || echo "DIAG: Could not download .deb — will try listing available assets") \
+    && if [ -s /tmp/sunshine.deb ]; then \
+         echo "=== .deb DEPENDENCIES ===" \
+         && dpkg -I /tmp/sunshine.deb | grep -i "depends" || true; \
+         echo "=== INSTALLING ===" \
+         && apt-get update \
+         && (apt-get install -y -f /tmp/sunshine.deb \
+             && echo ">>> SUNSHINE INSTALL: SUCCESS <<<" \
+             || echo ">>> SUNSHINE INSTALL: FAILED <<<") \
+         && rm -rf /var/lib/apt/lists/*; \
+       else \
+         echo ">>> SUNSHINE DOWNLOAD: FAILED — no matching .deb found <<<"; \
+       fi \
+    && rm -f /tmp/sunshine.deb || true
+
+# ── DIAG: check what got installed ──
+RUN echo "=== INSTALLED PACKAGES (sunshine/audio) ===" \
+    && (dpkg -l | grep -iE "pulse|pipewire|sunshine" || echo "No sunshine/audio packages found") \
+    && echo "=== SUNSHINE BINARY ===" \
+    && (which sunshine && sunshine --version || echo "Sunshine binary not found") \
+    && echo "=== SUNSHINE HELP (first 20 lines) ===" \
+    && (sunshine --help 2>&1 | head -20 || echo "Sunshine --help failed")
+
+# Add kasm-user to input group (needed for Sunshine virtual input)
+RUN usermod -aG input kasm-user || true
+
+# Copy runtime probe script
+COPY probe-streaming-readiness.sh /usr/local/bin/probe-streaming-readiness.sh
+RUN chmod +x /usr/local/bin/probe-streaming-readiness.sh
+
+# ══════════════════════════════════════════════════════════════
+# END DIAGNOSTIC BLOCK
+# ══════════════════════════════════════════════════════════════
+
 # Blender launcher wrapper — preloads Vulkan 1.3 + uses VirtualGL for KasmVNC
 RUN printf '#!/usr/bin/env bash\n\
 export LD_PRELOAD=/usr/local/lib/libvulkan.so.1.3.283\n\

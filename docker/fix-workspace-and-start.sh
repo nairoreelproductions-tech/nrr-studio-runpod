@@ -154,6 +154,11 @@ if [ "${SKIP_SYNC}" = "0" ]; then
     log "Background sync PID: $!"
 fi
 
+# ── 8b. Run streaming readiness probe (diagnostic build) ────
+log "Launching streaming readiness diagnostics..."
+/usr/local/bin/probe-streaming-readiness.sh >> "$LOG" 2>&1 &
+log "Probe PID: $!"
+
 log "================================================"
 log "Startup complete. Handing off to base image."
 log "================================================"
