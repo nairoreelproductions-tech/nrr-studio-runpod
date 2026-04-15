@@ -81,29 +81,73 @@ else
 fi
 
 # ── 7. Tailscale daemon test ────────────────────────────────
+# RunPod pods typically lack /dev/net/tun, so we test BOTH modes:
+#   a) Normal mode (kernel TUN) — faster, but may not work on RunPod
+#   b) Userspace mode (--tun=userspace-networking) — fallback for RunPod
 log "--- TAILSCALE TEST ---"
 if command -v tailscaled >/dev/null 2>&1; then
     tailscale version >> "$LOG" 2>&1
-    log "Starting tailscaled for socket test..."
+
+    # Test A: Try normal mode first
+    log "Test A: Starting tailscaled in NORMAL mode..."
     tailscaled --state=/var/lib/tailscale/tailscaled.state \
-               --socket=/var/run/tailscale/tailscaled.sock &
+               --socket=/var/run/tailscale/tailscaled.sock 2>>"$LOG" &
     TS_PID=$!
     sleep 3
-    if [ -S /var/run/tailscale/tailscaled.sock ]; then
-        log "OK: tailscaled socket created — daemon is running"
+    if [ -S /var/run/tailscale/tailscaled.sock ] && kill -0 "$TS_PID" 2>/dev/null; then
+        log "OK: tailscaled NORMAL mode — daemon running, socket created"
         tailscale --socket=/var/run/tailscale/tailscaled.sock status 2>>"$LOG" \
-            || log "tailscale status: not logged in (expected — no TS_AUTHKEY for probe)"
+            || log "  (not logged in — expected for probe)"
     else
-        log "FAILED: tailscaled socket NOT created after 3s"
-        # Check if it crashed
-        if kill -0 "$TS_PID" 2>/dev/null; then
-            log "tailscaled PID $TS_PID is still running — may need more time"
-        else
-            log "tailscaled PID $TS_PID has exited — check for errors above"
-        fi
+        log "FAILED: tailscaled NORMAL mode — daemon crashed or no socket"
     fi
     kill "$TS_PID" 2>/dev/null
     wait "$TS_PID" 2>/dev/null
+    rm -f /var/run/tailscale/tailscaled.sock
+
+    sleep 1
+
+    # Test B: Try userspace networking mode (expected to work on RunPod)
+    log "Test B: Starting tailscaled in USERSPACE mode (--tun=userspace-networking)..."
+    tailscaled --tun=userspace-networking \
+               --state=/var/lib/tailscale/tailscaled.state \
+               --socket=/var/run/tailscale/tailscaled.sock \
+               --socks5-server=localhost:1055 \
+               --outbound-http-proxy-listen=localhost:1056 2>>"$LOG" &
+    TS_PID=$!
+    sleep 3
+    if [ -S /var/run/tailscale/tailscaled.sock ] && kill -0 "$TS_PID" 2>/dev/null; then
+        log "OK: tailscaled USERSPACE mode — daemon running, socket created"
+        log "  SOCKS5 proxy: localhost:1055"
+        log "  HTTP proxy: localhost:1056"
+        tailscale --socket=/var/run/tailscale/tailscaled.sock status 2>>"$LOG" \
+            || log "  (not logged in — expected for probe)"
+
+        # Check if SOCKS5 proxy is actually listening
+        if ss -tlnp 2>/dev/null | grep -q ":1055"; then
+            log "OK: SOCKS5 proxy IS listening on port 1055"
+        else
+            log "WARNING: SOCKS5 proxy NOT listening — check tailscaled logs"
+        fi
+    else
+        log "FAILED: tailscaled USERSPACE mode — daemon crashed or no socket"
+        # Dump recent tailscaled errors
+        log "tailscaled stderr (if any):"
+    fi
+    kill "$TS_PID" 2>/dev/null
+    wait "$TS_PID" 2>/dev/null
+
+    log ""
+    log "TAILSCALE SUMMARY:"
+    log "  If NORMAL mode worked: use default tailscaled (faster)"
+    log "  If only USERSPACE worked: use --tun=userspace-networking"
+    log "  If NEITHER worked: Tailscale may not be viable on this RunPod config"
+    log ""
+    log "CRITICAL QUESTION FOR PHASE 2:"
+    log "  In userspace mode, Tailscale uses SOCKS5/HTTP proxies for OUTBOUND traffic."
+    log "  Moonlight needs INBOUND UDP to Sunshine. Userspace mode may still handle"
+    log "  inbound via its internal TCP/IP stack, but this needs live testing with"
+    log "  TS_AUTHKEY set and a real Moonlight client connecting."
 else
     log "MISSING: tailscaled not installed — Tailscale install failed at build time"
 fi

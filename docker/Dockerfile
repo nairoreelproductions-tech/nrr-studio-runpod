@@ -34,16 +34,10 @@ RUN cd /tmp \
 # ── DIAG: confirm base OS version ──
 RUN echo "=== OS VERSION ===" && cat /etc/os-release
 
-# ── DIAG: install Tailscale using detected OS codename ──
-RUN . /etc/os-release && echo "Detected codename: ${VERSION_CODENAME}" \
-    && curl -fsSL "https://pkgs.tailscale.com/stable/ubuntu/${VERSION_CODENAME}.noarmor.gpg" \
-         | tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null \
-    && curl -fsSL "https://pkgs.tailscale.com/stable/ubuntu/${VERSION_CODENAME}.tailscale-keyring.list" \
-         | tee /etc/apt/sources.list.d/tailscale.list \
-    && apt-get update && apt-get install -y --no-install-recommends tailscale \
+# ── DIAG: install Tailscale using official installer (auto-detects OS) ──
+RUN curl -fsSL https://tailscale.com/install.sh | sh \
     && echo "Tailscale version:" && tailscale version \
-    && mkdir -p /var/run/tailscale /var/lib/tailscale \
-    && rm -rf /var/lib/apt/lists/*
+    && mkdir -p /var/run/tailscale /var/lib/tailscale
 
 # ── DIAG: install Sunshine deps + attempt .deb install ──
 # We try multiple URL patterns since LizardByte naming varies by release.
@@ -52,27 +46,49 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libevdev-dev libcap-dev libdrm-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# First, list what assets are actually available in the latest Sunshine release
+RUN echo "=== SUNSHINE: Available release assets ===" \
+    && (curl -fsSL https://api.github.com/repos/LizardByte/Sunshine/releases/latest \
+        | grep -o '"name": "[^"]*\.deb"' || echo "Could not fetch release assets") \
+    && echo "=== END ASSETS ==="
+
+# Try multiple URL patterns — LizardByte naming changes between releases
 RUN . /etc/os-release \
     && echo "=== SUNSHINE INSTALL ATTEMPT ===" \
-    && echo "Trying sunshine-${VERSION_CODENAME}-amd64.deb ..." \
-    && (curl -fSL -o /tmp/sunshine.deb \
-         "https://github.com/LizardByte/Sunshine/releases/latest/download/sunshine-${VERSION_CODENAME}-amd64.deb" \
-         2>/dev/null \
-       || curl -fSL -o /tmp/sunshine.deb \
-         "https://github.com/LizardByte/Sunshine/releases/latest/download/sunshine-ubuntu-${VERSION_ID}-amd64.deb" \
-         2>/dev/null \
-       || echo "DIAG: Could not download .deb — will try listing available assets") \
-    && if [ -s /tmp/sunshine.deb ]; then \
+    && echo "OS: ${NAME} ${VERSION_ID} (${VERSION_CODENAME})" \
+    && FOUND=0 \
+    && for pattern in \
+         "sunshine-${VERSION_CODENAME}-amd64.deb" \
+         "sunshine-ubuntu-${VERSION_ID}-amd64.deb" \
+         "sunshine-${VERSION_CODENAME}_amd64.deb" \
+         "sunshine_${VERSION_CODENAME}_amd64.deb" \
+         "sunshine-jammy-amd64.deb" \
+         "sunshine-focal-amd64.deb" \
+         "sunshine-ubuntu-22.04-amd64.deb" \
+         "sunshine-ubuntu-20.04-amd64.deb"; do \
+         echo "Trying: ${pattern} ..." \
+         && if curl -fSL -o /tmp/sunshine.deb \
+              "https://github.com/LizardByte/Sunshine/releases/latest/download/${pattern}" \
+              2>/dev/null && [ -s /tmp/sunshine.deb ]; then \
+              echo ">>> DOWNLOADED: ${pattern} <<<"; \
+              FOUND=1; \
+              break; \
+            else \
+              rm -f /tmp/sunshine.deb; \
+            fi; \
+       done \
+    && if [ "$FOUND" = "1" ]; then \
          echo "=== .deb DEPENDENCIES ===" \
-         && dpkg -I /tmp/sunshine.deb | grep -i "depends" || true; \
-         echo "=== INSTALLING ===" \
+         && (dpkg -I /tmp/sunshine.deb | grep -i "depends" || true) \
+         && echo "=== INSTALLING ===" \
          && apt-get update \
          && (apt-get install -y -f /tmp/sunshine.deb \
              && echo ">>> SUNSHINE INSTALL: SUCCESS <<<" \
-             || echo ">>> SUNSHINE INSTALL: FAILED <<<") \
+             || echo ">>> SUNSHINE INSTALL: FAILED (dependency issue?) <<<") \
          && rm -rf /var/lib/apt/lists/*; \
        else \
-         echo ">>> SUNSHINE DOWNLOAD: FAILED — no matching .deb found <<<"; \
+         echo ">>> SUNSHINE DOWNLOAD: FAILED — none of the URL patterns matched <<<" \
+         && echo ">>> Check the 'Available release assets' output above for correct filename <<<"; \
        fi \
     && rm -f /tmp/sunshine.deb || true
 
