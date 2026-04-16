@@ -1,0 +1,5 @@
+.env.studio
+.env
+*.log
+*.key
+*.pem

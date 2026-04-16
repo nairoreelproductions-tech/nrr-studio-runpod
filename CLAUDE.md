@@ -2,12 +2,11 @@
 
 ## What This Project Is
 
-We are building a plug-and-play GPU workstation system for Nairoeel Productions to use Blender on RunPod. Any team member should be able to spin up a GPU pod in any region, open a browser desktop, launch Blender, and have all their files already there — with changes syncing back automatically.
+A plug-and-play GPU workstation system for Nairoeel Productions. Any team member can rent a Vast.ai VM, run a bootstrap script, and have a full Blender environment with all their files synced from the VPS — ready to work in minutes.
 
-The system has three parts that must be built in order:
-1. VPS storage partition (RackNerd VPS, already running Coolify)
-2. Custom Docker image (published to Docker Hub)
-3. RunPod template configured to use that image
+The system has two parts:
+1. **VPS storage** (RackNerd, already set up and working)
+2. **Bootstrap script** that configures any Vast.ai Ubuntu Desktop VM
 
 ---
 
@@ -20,12 +19,16 @@ Team member
   │                                               │
   │                                          SFTP (port 22, studio-sync user)
   │                                               │
-  └─── opens RunPod pod ──────────────────► Custom Docker image pulls files on startup
-                                            rclone syncs PROJECTS/ back every 5 min
-                                            Blender ready on desktop
+  └─── rents Vast.ai VM ──────────────────► bootstrap.sh pulls files on first run
+                                            crontab syncs PROJECTS back every 5 min
+                                            Blender + addons ready on KDE desktop
+                                            Access via WebRTC (browser) or Moonlight
 ```
 
-**Key decision: storage uses SFTP directly over existing SSH (port 22). No new Nginx config. Client portal is completely untouched.**
+**Key decisions:**
+- Storage uses SFTP over existing SSH (port 22). No new Nginx config.
+- Compute uses Vast.ai Ubuntu Desktop (VM) template — full VM, not containers.
+- Secrets injected via SSH session env vars ("laptop-as-control-center" model).
 
 ---
 
@@ -33,16 +36,14 @@ Team member
 
 See `docs/VPS_REFERENCE.md` for full server documentation.
 
-Critical facts for this project:
+Critical facts:
 - IP: `107.172.153.249`
 - Port 22 is open (iptables already allows it)
 - OS: Ubuntu 24.04 LTS
-- Everything runs via Docker/Coolify
 - Auth: Ed25519 key only, password auth disabled
-- The sshd_config drop-in `/etc/ssh/sshd_config.d/50-cloud-init.conf` overrides the main config — any SSH changes must be applied to BOTH files
+- The sshd_config drop-in `/etc/ssh/sshd_config.d/50-cloud-init.conf` overrides the main config
 - **Do not touch**: coolify-proxy (Traefik), iptables rules, /data/coolify/, client portal Nginx config
-- Default iptables policy is DROP — port 22 is already open, no new ports needed for this project
-- Before editing sshd_config: always `cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak-YYYYMMDD` first
+- Before editing sshd_config: always backup first
 
 ---
 
@@ -50,7 +51,7 @@ Critical facts for this project:
 
 ```
 /srv/studio/                        ← chroot root, owned by ROOT (OpenSSH requirement)
-├── BLENDER_APPS/                   ← owned by studio-sync, Blender tarballs + extracted app
+├── BLENDER_APPS/                   ← Blender tarballs (e.g. blender-4.5.7-linux-x64.tar.xz)
 ├── CONFIG_MASTER/
 │   └── scripts/
 │       └── addons/                 ← Blender addon folders
@@ -63,37 +64,49 @@ Critical facts for this project:
         └── tex/
 ```
 
-**Critical**: `/srv/studio/` itself must be owned by `root:root` with permissions `755`. This is an OpenSSH chroot requirement — if it is owned by `studio-sync`, the chroot will refuse to start.
+**Critical**: `/srv/studio/` must be owned by `root:root` with permissions `755` (OpenSSH chroot requirement).
 
 ---
 
 ## The `studio-sync` SSH User
 
 - System user, no shell (`/usr/sbin/nologin`), home is `/srv/studio`
-- Authenticates via Ed25519 keypair generated specifically for rclone (separate from the admin .ppk key)
+- Authenticates via Ed25519 keypair (separate from the admin key)
 - Chrooted to `/srv/studio` via sshd_config `Match User` block
 - Can only SFTP, no shell access, no TCP forwarding
-- The `Match User` block must be added at the **bottom** of `/etc/ssh/sshd_config` (Match blocks must come last)
 
 ---
 
-## Docker Image
+## Vast.ai VM Setup
 
-- Base: `madiator2011/kasm-runpod-desktop:mldesk`
-- Desktop user inside the image: `kasm-user` (hyphen, not underscore)
-- Published to: Docker Hub as `YOUR_DOCKERHUB_USERNAME/nrr-studio:1.0` (replace with real username)
-- Built on Windows with Docker Desktop — no GPU needed at build time
-- Files: `docker/Dockerfile` and `docker/fix-workspace-and-start.sh`
+- Template: **Ubuntu Desktop (VM)** on Vast.ai
+- Desktop user: `user` (password: `password`)
+- Pre-installed: Blender, Sunshine, Moonlight, Tailscale, KDE Plasma, GPU drivers
+- Bootstrap script: `bootstrap.sh` at repo root
+- Studio files: `/home/user/studio/`
+
+### How It Works
+
+1. Team member rents a VM and SSHes in (or uses browser desktop)
+2. Exports `VPS_SSH_KEY_B64` env var and runs `bootstrap.sh`
+3. Script installs rclone, pulls files from VPS, configures Blender addons, sets up crontab sync
+4. Blender is ready with addons; PROJECTS sync back to VPS every 5 minutes
+
+### Blender Version Handling
+
+- If the VM's pre-installed Blender version matches what's on the VPS → uses pre-installed
+- If a different version tarball exists in BLENDER_APPS on the VPS → extracts it, creates `blender-studio` wrapper and desktop shortcut
+- Addons from CONFIG_MASTER are symlinked into the active Blender's config directory
 
 ---
 
-## Environment Variables (Set in RunPod Template)
+## Environment Variables
 
-| Variable | Description |
-|---|---|
-| `VPS_SSH_KEY_B64` | Base64-encoded OpenSSH private key for studio-sync user |
+| Variable | Description | Where Set |
+|---|---|---|
+| `VPS_SSH_KEY_B64` | Base64-encoded OpenSSH private key for studio-sync | Exported via SSH session before running bootstrap |
 
-The VPS host IP is hardcoded in the startup script (`107.172.153.249`) since it never changes.
+The VPS host IP is hardcoded in `bootstrap.sh` (`107.172.153.249`) since it never changes.
 
 ---
 
@@ -101,28 +114,50 @@ The VPS host IP is hardcoded in the startup script (`107.172.153.249`) since it 
 
 | Folder | Direction | Frequency |
 |---|---|---|
-| `BLENDER_APPS/` | VPS → Pod (pull only) | Once at startup |
-| `CONFIG_MASTER/` | VPS → Pod (pull only) | Once at startup |
-| `LIBRARY_GLOBAL/` | VPS → Pod (pull only) | Once at startup |
-| `PROJECTS/` | VPS → Pod at start, Pod → VPS ongoing | Pull at startup, push every 5 min |
+| `BLENDER_APPS/` | VPS → VM (pull only) | Once at bootstrap |
+| `CONFIG_MASTER/` | VPS → VM (pull only) | Once at bootstrap |
+| `LIBRARY_GLOBAL/` | VPS → VM (pull only) | Once at bootstrap |
+| `PROJECTS/` | VPS → VM at bootstrap, VM → VPS ongoing | Pull at bootstrap, push every 5 min via crontab |
 
-Libraries and Blender are treated as read-only on the pod side — the VPS is the source of truth for those. Only PROJECTS syncs back.
+Libraries, configs, and Blender are read-only on the VM. Only PROJECTS syncs back.
+
+---
+
+## VM File Structure
+
+```
+/home/user/studio/                  ← studio root
+├── BLENDER_APPS/                   ← pulled from VPS, may contain extracted blender-app/
+├── CONFIG_MASTER/scripts/addons/   ← pulled from VPS, symlinked into Blender config
+├── LIBRARY_GLOBAL/                 ← pulled from VPS
+└── PROJECTS/                       ← pulled from VPS, syncs back every 5 min
+```
+
+---
+
+## Access Methods
+
+| Method | Latency | Setup |
+|---|---|---|
+| WebRTC (browser) | 50–100ms | Click "Open" in Vast.ai console |
+| Moonlight + Sunshine | 20–60ms | Tailscale on both sides, see docs/VASTAI_QUICKSTART.md |
+| VNC | 80–150ms | VNC client to mapped port 5900 |
+| SSH | N/A | `ssh -p <port> user@<ip>` |
 
 ---
 
 ## Definition of Done
 
-- [ ] `/srv/studio/` directory structure exists on VPS with correct ownership
-- [ ] `studio-sync` user exists on VPS
-- [ ] sshd_config `Match User` block in place, SSH restarted
-- [ ] SFTP connection works: `sftp -i studio_sync_key -P 22 studio-sync@107.172.153.249`
-- [ ] rclone keypair generated, public key in `/srv/studio/.ssh/authorized_keys`
-- [ ] Docker image builds without errors
-- [ ] Docker image pushed to Docker Hub
-- [ ] RunPod template updated with new image name and `VPS_SSH_KEY_B64` env var
-- [ ] Pod launched, `/workspace` is writable by kasm-user
-- [ ] Blender launches from desktop shortcut
-- [ ] File created in `/workspace/PROJECTS/` appears on VPS within 5 minutes
+- [x] `/srv/studio/` directory structure exists on VPS with correct ownership
+- [x] `studio-sync` user exists on VPS
+- [x] sshd_config `Match User` block in place, SSH restarted
+- [x] SFTP connection works
+- [x] rclone keypair generated, public key in authorized_keys
+- [ ] `bootstrap.sh` runs successfully on a Vast.ai VM
+- [ ] Files appear in `~/studio/` after bootstrap
+- [ ] Blender launches with addons loaded
+- [ ] File created in `~/studio/PROJECTS/` appears on VPS within 5 minutes
+- [ ] Moonlight streaming works via Tailscale
 
 ---
 
@@ -132,5 +167,5 @@ Libraries and Blender are treated as read-only on the pod side — the VPS is th
 - Do not run `docker system prune -a` on the VPS
 - Do not change iptables rules (port 22 is already open)
 - Do not use `chmod 777` anywhere
-- Do not store actual private key values in any file in this repo — the key goes in RunPod's environment variable field only
+- Do not store private key values in any file in this repo — keys are injected via env vars at runtime
 - Do not add log files to the VPS Nginx config without also adding logrotate entries
