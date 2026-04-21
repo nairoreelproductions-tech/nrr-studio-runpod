@@ -1,7 +1,7 @@
 # NRR Studio
 
 Cloud GPU workstation system for [Nairoeel Productions](https://nairoeel.com). Rent a Vast.ai VM, run one script, and get a full Blender environment with your project files synced from the VPS.
-
+## 📖 [Click here for the Studio Team Manual](VM_MANUAL.md)
 ## How It Works
 
 ```
