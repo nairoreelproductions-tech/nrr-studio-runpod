@@ -1,173 +1,190 @@
-#!/usr/bin/env bash
-# ─────────────────────────────────────────────────────────────
-# NRR Cloud Workstation — Bootstrap v5 (User-Owned, Correct Paths)
-# Run inside VNC terminal as 'user':
-#   export VPS_SSH_KEY_B64="your_key_here"
-#   curl -fsSL https://raw.githubusercontent.com/.../bootstrap.sh | bash
-# ─────────────────────────────────────────────────────────────
-set -eo pipefail
+-----
 
-# ── CONFIGURATION ─────────────────────────────────────────────
-VPS_HOST="107.172.153.249"
-VPS_USER="studio-sync"
-STUDIO_ROOT="$HOME/studio"
-DESKTOP_DIR="$HOME/Desktop"
-KEY_FILE="$HOME/.ssh/studio_sync_key"
-LOG="$STUDIO_ROOT/bootstrap.log"
+# NRR Cloud Studio Manual
 
-mkdir -p "$STUDIO_ROOT" "$DESKTOP_DIR"
-log() { echo "[nrr] $(date '+%H:%M:%S') $*" | tee -a "$LOG"; }
+> **Internal Team Doc · v5**
 
-log "========================================"
-log "NRR Bootstrap | user: $(whoami) | home: $HOME"
-log "========================================"
+How to set up, use, and stay in sync with the shared cloud workstation.
 
-# ── SECTION 1: SSH Key (stored in user home, user-owned) ──────
-mkdir -p "$HOME/.ssh"
-chmod 700 "$HOME/.ssh"
+-----
 
-if [ -z "${VPS_SSH_KEY_B64:-}" ]; then
-    log "ERROR: VPS_SSH_KEY_B64 is not set. Export it before running."
-    exit 1
-fi
+## 📑 Contents
 
-echo "$VPS_SSH_KEY_B64" | base64 -d > "$KEY_FILE"
-chmod 600 "$KEY_FILE"
-log "SSH key written to $KEY_FILE"
+1.  [System Overview](https://www.google.com/search?q=%2301--system-overview)
+2.  [First-Time Setup](https://www.google.com/search?q=%2302--first-time-setup)
+3.  [Folder Structure](https://www.google.com/search?q=%2303--folder-structure)
+4.  [Command Reference](https://www.google.com/search?q=%2304--command-reference)
+5.  [Daily Workflows](https://www.google.com/search?q=%2305--daily-workflows)
+6.  [Team Rules](https://www.google.com/search?q=%2306--team-rules)
+7.  [Troubleshooting](https://www.google.com/search?q=%2307--troubleshooting)
+8.  [FAQ](https://www.google.com/search?q=%2308--faq)
 
-ssh-keyscan -p 22 "$VPS_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
+-----
 
-# ── SECTION 2: Install rclone (safe two-step, not piped sudo) ─
-if ! command -v rclone &>/dev/null; then
-    log "Installing rclone..."
-    curl -fsSL https://rclone.org/install.sh -o /tmp/rclone_install.sh
-    sudo bash /tmp/rclone_install.sh
-    rm -f /tmp/rclone_install.sh
-fi
-log "rclone: $(command -v rclone)"
+## 01 — System Overview
 
-# ── SECTION 3: Rclone Config (user-owned) ─────────────────────
-mkdir -p "$HOME/.config/rclone"
-cat > "$HOME/.config/rclone/rclone.conf" << EOF
-[vps]
-type = sftp
-host = $VPS_HOST
-port = 22
-user = $VPS_USER
-key_file = $KEY_FILE
-EOF
-log "rclone config written."
+NRR Studio runs on a central VPS that holds all shared project files, Blender builds, and asset libraries. Each team member connects to it through a cloud workstation (VNC desktop) that is bootstrapped automatically. Files sync between your local workspace and the VPS using **rclone** over a private SSH connection.
 
-# ── SECTION 4: Data Pull ──────────────────────────────────────
-# CRITICAL: studio-sync SFTP root IS /srv/studio on the VPS.
-# Paths here are relative to that root. Do NOT prefix with /srv/studio.
-log "Pulling data from VPS..."
-mkdir -p "$STUDIO_ROOT/PROJECTS" \
-         "$STUDIO_ROOT/BLENDER_APPS" \
-         "$STUDIO_ROOT/LIBRARY_GLOBAL" \
-         "$STUDIO_ROOT/CONFIG_MASTER"
+### Data Flow
 
-rclone copy vps:/PROJECTS       "$STUDIO_ROOT/PROJECTS"       --transfers=8  --stats=10s
-rclone copy vps:/BLENDER_APPS   "$STUDIO_ROOT/BLENDER_APPS"   --transfers=4  --stats=10s
-rclone copy vps:/LIBRARY_GLOBAL "$STUDIO_ROOT/LIBRARY_GLOBAL" --transfers=16 --stats=10s
-rclone copy vps:/CONFIG_MASTER  "$STUDIO_ROOT/CONFIG_MASTER"  --transfers=4  --stats=10s
+```mermaid
+graph LR
+    A[Your VNC Desktop] <--> B(~/studio/PROJECTS)
+    B <--> C{VPS /PROJECTS}
+    C <--> D[Teammates Desktops]
+    style C fill:#e8ff47,stroke:#333,stroke-width:2px,color:#000
+```
 
-# ── SECTION 5: Blender 4.5.7 Setup ───────────────────────────
-log "Setting up Blender..."
-BLENDER_TAR=$(ls "$STUDIO_ROOT/BLENDER_APPS/blender-4.5.7"*.tar.xz 2>/dev/null | head -1 || true)
+> [\!NOTE]
+> **Key Concept:** Your `~/studio/` folder is your local workspace. The VPS is the shared source of truth. Syncing is *not automatic on pull* — you control when you fetch new work.
 
-if [ -n "$BLENDER_TAR" ]; then
-    if [ ! -d "$STUDIO_ROOT/BLENDER_APPS/blender-app" ]; then
-        log "Extracting $BLENDER_TAR..."
-        tar -xf "$BLENDER_TAR" -C "$STUDIO_ROOT/BLENDER_APPS/"
-        EXTRACTED_DIR=$(ls -d "$STUDIO_ROOT/BLENDER_APPS/blender-4.5.7"*linux* 2>/dev/null | head -1)
-        mv "$EXTRACTED_DIR" "$STUDIO_ROOT/BLENDER_APPS/blender-app"
-    fi
+### Auto-sync
 
-    cat > "$DESKTOP_DIR/Blender-Studio.desktop" << EOF
-[Desktop Entry]
-Name=Blender 4.5.7 (Studio)
-Exec=$STUDIO_ROOT/BLENDER_APPS/blender-app/blender %f
-Icon=$STUDIO_ROOT/BLENDER_APPS/blender-app/blender.svg
-Type=Application
-Terminal=false
-EOF
-    chmod +x "$DESKTOP_DIR/Blender-Studio.desktop"
-    log "Blender shortcut created."
-else
-    log "WARNING: No blender-4.5.7 tar.xz found in BLENDER_APPS. Skipping."
-fi
+Your `PROJECTS` folder pushes to the VPS automatically every **5 minutes** in the background. You don't need to do anything for your saves to reach the server — but you do need to manually pull to receive other people's changes.
 
-# ── SECTION 6: Cron Sync Back to VPS ─────────────────────────
-# Sync uses same relative path. Runs as user, uses user's rclone config.
-CRON_CMD="rclone sync $STUDIO_ROOT/PROJECTS vps:/PROJECTS --transfers=4 2>>$LOG"
-(crontab -l 2>/dev/null | grep -v "vps:/PROJECTS"; echo "*/5 * * * * $CRON_CMD") | crontab -
-log "Cron sync registered."
+-----
 
-# ── SECTION 7: Shell Aliases ──────────────────────────────────
-log "Registering studio aliases..."
+## 02 — First-Time Setup
 
-ALIAS_BLOCK='
-# ── NRR Studio Aliases ─────────────────────────────────────────
-STUDIO_ROOT="$HOME/studio"
-STUDIO_LOG="$HOME/studio/bootstrap.log"
+You only need to run this once per machine or new VNC session. Ask the team lead for your `VPS_SSH_KEY_B64` value before starting.
 
-# Pull everything fresh from the VPS (PROJECTS + LIBRARY + CONFIG)
-alias studio-pull='rclone copy vps:/PROJECTS       $HOME/studio/PROJECTS       --transfers=8  --progress &&
-                   rclone copy vps:/LIBRARY_GLOBAL  $HOME/studio/LIBRARY_GLOBAL --transfers=16 --progress &&
-                   rclone copy vps:/CONFIG_MASTER   $HOME/studio/CONFIG_MASTER  --transfers=4  --progress &&
-                   echo "[nrr] Pull complete."'
+1.  **Open a terminal** inside the VNC desktop.
+2.  **Export your SSH key** (provided by the team lead — keep this private):
+    ```bash
+    export VPS_SSH_KEY_B64="paste_your_key_here"
+    ```
+3.  **Run the bootstrap script**:
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/YOUR_REPO/bootstrap.sh | bash
+    ```
+4.  **Wait for it to finish.** It will download all project files, set up Blender, and register all aliases.
+5.  **Reload your shell** so aliases are available:
+    ```bash
+    source ~/.bashrc
+    ```
+6.  **Launch Blender** from the Desktop shortcut or type `studio-open`.
 
-# Pull PROJECTS only — fastest, use this after a teammate uploads a file
-alias studio-pull-projects='rclone copy vps:/PROJECTS $HOME/studio/PROJECTS --transfers=8 --progress && echo "[nrr] Projects pulled."'
+> [\!WARNING]
+> **Important:** Never share your `VPS_SSH_KEY_B64` in chat, email, or commits. Treat it like a password.
 
-# Push PROJECTS up to VPS immediately (does not wait for the 5-min cron)
-alias studio-push='rclone sync $HOME/studio/PROJECTS vps:/PROJECTS --transfers=8 --progress && echo "[nrr] Push complete."'
+-----
 
-# Push a single folder by name: studio-push-folder my_scene
-alias studio-push-folder='f(){ rclone sync "$HOME/studio/PROJECTS/$1" "vps:/PROJECTS/$1" --transfers=4 --progress && echo "[nrr] Pushed: $1"; }; f'
+## 03 — Folder Structure
 
-# Show files that differ between local PROJECTS and VPS (dry-run, no changes made)
-alias studio-status='rclone check $HOME/studio/PROJECTS vps:/PROJECTS --one-way 2>&1 | grep -E "ERROR|not found|differ|Match" || echo "[nrr] All in sync."'
+Save everything you want synced inside `~/studio/PROJECTS/`. Files saved anywhere else will not reach the VPS.
 
-# Full bidirectional sync: pull everything down, then push projects up
-alias studio-sync='studio-pull && studio-push && echo "[nrr] Full sync done."'
+```text
+~/studio/
+├── PROJECTS/           # Your working files (synced every 5 min)
+│   ├── my_scene/
+│   └── client_render/
+├── LIBRARY_GLOBAL/     # Shared assets, HDRIs, materials (read-heavy)
+├── BLENDER_APPS/       # Blender install (do not edit)
+│   └── blender-app/    # Extracted Blender 4.5.7 binary
+└── CONFIG_MASTER/      # Shared startup files, preferences, keymaps
+```
 
-# Tail the live sync log
-alias studio-log='tail -f $HOME/studio/bootstrap.log'
+-----
 
-# List everything currently on the VPS PROJECTS folder
-alias studio-ls='rclone ls vps:/PROJECTS'
+## 04 — Command Reference
 
-# Launch Blender
-alias studio-open='$HOME/studio/BLENDER_APPS/blender-app/blender &'
-# ── End NRR Studio Aliases ────────────────────────────────────
-'
+All commands are available in any terminal after running the bootstrap.
 
-# Write aliases to .bashrc if not already present
-if ! grep -q "NRR Studio Aliases" "$HOME/.bashrc" 2>/dev/null; then
-    echo "$ALIAS_BLOCK" >> "$HOME/.bashrc"
-    log "Aliases written to ~/.bashrc"
-else
-    log "Aliases already present in ~/.bashrc — skipping."
-fi
+| Command | What it does | Direction |
+| :--- | :--- | :--- |
+| `studio-pull` | Pulls PROJECTS, LIBRARY\_GLOBAL, and CONFIG\_MASTER from VPS. | `← VPS` |
+| `studio-pull-projects` | Pulls PROJECTS only — skips library and config. Faster. | `← VPS` |
+| `studio-push` | Immediately pushes your entire PROJECTS folder to the VPS. | `→ VPS` |
+| `studio-push-folder` | Push a single named project folder: `studio-push-folder my_scene` | `→ VPS` |
+| `studio-sync` | Runs a full pull (all folders) followed by a push. | `← VPS` / `→ VPS` |
+| `studio-status` | Shows files that differ between local and VPS (Read-only). | `Check` |
+| `studio-ls` | Lists all files currently in the VPS PROJECTS folder with sizes. | `Read` |
+| `studio-log` | Streams the live sync log (`Ctrl+C` to exit). | `Log` |
+| `studio-open` | Launches Blender 4.5.7 in the background. | `App` |
 
-# Make aliases available in the current session
-# shellcheck disable=SC1090
-source "$HOME/.bashrc" 2>/dev/null || true
+-----
 
-log "========================================"
-log "DONE. All files in $STUDIO_ROOT are owned by $(whoami)."
-log "Blender can save. Rclone will sync back every 5 min."
-log ""
-log "Available commands:"
-log "  studio-pull           Pull all folders from VPS"
-log "  studio-pull-projects  Pull PROJECTS only (fastest)"
-log "  studio-push           Push PROJECTS to VPS now"
-log "  studio-push-folder    Push a single project folder"
-log "  studio-status         See what's out of sync"
-log "  studio-sync           Full pull + push in one go"
-log "  studio-log            Watch the live sync log"
-log "  studio-ls             List VPS project files"
-log "  studio-open           Launch Blender"
-log "========================================"
+## 05 — Daily Workflows
+
+### Starting a session
+
+1.  Open terminal in VNC.
+2.  Pull latest work: `studio-pull`
+3.  Launch Blender: `studio-open`
+4.  Work normally. Your saves auto-push every 5 minutes.
+
+### Handing off to a teammate
+
+1.  Save your blend file inside `~/studio/PROJECTS/your_folder/`.
+2.  Force-push immediately: `studio-push`
+3.  Tell your teammate to run `studio-pull-projects`.
+
+### Uploading a packed .blend from local machine
+
+1.  Copy your `.blend` into the correct folder under `~/studio/PROJECTS/` on the VNC desktop.
+2.  Push it up immediately: `studio-push-folder your_project_folder`
+3.  Confirm it landed: `studio-ls`
+
+> [\!IMPORTANT]
+> **Avoid conflicts:** Do not have two people working on the same `.blend` file at the same time. Rclone is a "last-write-wins" system. Coordinate before working on the same file.
+
+-----
+
+## 06 — Team Rules
+
+  * **Always save inside `~/studio/PROJECTS/`**: Files saved elsewhere are local-only and lost when sessions reset.
+  * **Use subfolders**: Don't dump files in the root. Use `PROJECTS/renders_john/` or `PROJECTS/client_abc/`.
+  * **Communicate**: If you're pushing a large scene (packed textures, etc.), tell the team.
+  * **Don't edit LIBRARY\_GLOBAL/CONFIG\_MASTER**: These affect everyone. Consult the team lead first.
+  * **Pack your files**: Use **File → External Data → Pack All Into .blend** before handoffs to prevent missing textures.
+
+-----
+
+## 07 — Troubleshooting
+
+### Commands not found
+
+The aliases live in `~/.bashrc`. Fix by running:
+
+```bash
+source ~/.bashrc
+```
+
+### Connection Refused / Handshake Failed
+
+SSH key may have reset. Re-run bootstrap with the correct `VPS_SSH_KEY_B64`.
+
+### Blender can't find textures
+
+The file was likely not packed. Ask the author to re-pack and push, or use **File → External Data → Find Missing Files** pointed at `~/studio/LIBRARY_GLOBAL/`.
+
+### Check the Log
+
+To see detailed error messages (like network timeouts):
+
+```bash
+studio-log
+```
+
+-----
+
+## 08 — FAQ
+
+**Do I need to push manually? Won't the cron do it?**
+The cron pushes every 5 minutes. Manual push is only for immediate handoffs.
+
+**What happens if I forget to pull before working?**
+You may overwrite a teammate's newer version when you push. Always pull at the start of a session.
+
+**Will my work survive a VNC session reset?**
+Yes—as long as you saved in `PROJECTS` and it had 5 minutes to sync. After reset, just run `studio-pull-projects`.
+
+**How do I check my Blender version?**
+
+```bash
+~/studio/BLENDER_APPS/blender-app/blender --version
+```
+
+-----
+
+**NRR Cloud Studio — Keep this private**
