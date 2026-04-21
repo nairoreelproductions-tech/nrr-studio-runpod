@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────
-# NRR Cloud Workstation — Bootstrap v4 (User-Owned, Correct Paths)
+# NRR Cloud Workstation — Bootstrap v5 (User-Owned, Correct Paths)
 # Run inside VNC terminal as 'user':
 #   export VPS_SSH_KEY_B64="your_key_here"
 #   curl -fsSL https://raw.githubusercontent.com/.../bootstrap.sh | bash
@@ -104,7 +104,70 @@ CRON_CMD="rclone sync $STUDIO_ROOT/PROJECTS vps:/PROJECTS --transfers=4 2>>$LOG"
 (crontab -l 2>/dev/null | grep -v "vps:/PROJECTS"; echo "*/5 * * * * $CRON_CMD") | crontab -
 log "Cron sync registered."
 
+# ── SECTION 7: Shell Aliases ──────────────────────────────────
+log "Registering studio aliases..."
+
+ALIAS_BLOCK='
+# ── NRR Studio Aliases ─────────────────────────────────────────
+STUDIO_ROOT="$HOME/studio"
+STUDIO_LOG="$HOME/studio/bootstrap.log"
+
+# Pull everything fresh from the VPS (PROJECTS + LIBRARY + CONFIG)
+alias studio-pull='rclone copy vps:/PROJECTS       $HOME/studio/PROJECTS       --transfers=8  --progress &&
+                   rclone copy vps:/LIBRARY_GLOBAL  $HOME/studio/LIBRARY_GLOBAL --transfers=16 --progress &&
+                   rclone copy vps:/CONFIG_MASTER   $HOME/studio/CONFIG_MASTER  --transfers=4  --progress &&
+                   echo "[nrr] Pull complete."'
+
+# Pull PROJECTS only — fastest, use this after a teammate uploads a file
+alias studio-pull-projects='rclone copy vps:/PROJECTS $HOME/studio/PROJECTS --transfers=8 --progress && echo "[nrr] Projects pulled."'
+
+# Push PROJECTS up to VPS immediately (does not wait for the 5-min cron)
+alias studio-push='rclone sync $HOME/studio/PROJECTS vps:/PROJECTS --transfers=8 --progress && echo "[nrr] Push complete."'
+
+# Push a single folder by name: studio-push-folder my_scene
+alias studio-push-folder='f(){ rclone sync "$HOME/studio/PROJECTS/$1" "vps:/PROJECTS/$1" --transfers=4 --progress && echo "[nrr] Pushed: $1"; }; f'
+
+# Show files that differ between local PROJECTS and VPS (dry-run, no changes made)
+alias studio-status='rclone check $HOME/studio/PROJECTS vps:/PROJECTS --one-way 2>&1 | grep -E "ERROR|not found|differ|Match" || echo "[nrr] All in sync."'
+
+# Full bidirectional sync: pull everything down, then push projects up
+alias studio-sync='studio-pull && studio-push && echo "[nrr] Full sync done."'
+
+# Tail the live sync log
+alias studio-log='tail -f $HOME/studio/bootstrap.log'
+
+# List everything currently on the VPS PROJECTS folder
+alias studio-ls='rclone ls vps:/PROJECTS'
+
+# Launch Blender
+alias studio-open='$HOME/studio/BLENDER_APPS/blender-app/blender &'
+# ── End NRR Studio Aliases ────────────────────────────────────
+'
+
+# Write aliases to .bashrc if not already present
+if ! grep -q "NRR Studio Aliases" "$HOME/.bashrc" 2>/dev/null; then
+    echo "$ALIAS_BLOCK" >> "$HOME/.bashrc"
+    log "Aliases written to ~/.bashrc"
+else
+    log "Aliases already present in ~/.bashrc — skipping."
+fi
+
+# Make aliases available in the current session
+# shellcheck disable=SC1090
+source "$HOME/.bashrc" 2>/dev/null || true
+
 log "========================================"
 log "DONE. All files in $STUDIO_ROOT are owned by $(whoami)."
 log "Blender can save. Rclone will sync back every 5 min."
+log ""
+log "Available commands:"
+log "  studio-pull           Pull all folders from VPS"
+log "  studio-pull-projects  Pull PROJECTS only (fastest)"
+log "  studio-push           Push PROJECTS to VPS now"
+log "  studio-push-folder    Push a single project folder"
+log "  studio-status         See what's out of sync"
+log "  studio-sync           Full pull + push in one go"
+log "  studio-log            Watch the live sync log"
+log "  studio-ls             List VPS project files"
+log "  studio-open           Launch Blender"
 log "========================================"
