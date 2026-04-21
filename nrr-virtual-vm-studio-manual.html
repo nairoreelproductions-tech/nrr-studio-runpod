@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NRR Cloud Studio — Team Manual</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Syne:wght@400;700;800&display=swap');
+
+  :root {
+    --bg:        #0d0d0d;
+    --surface:   #161616;
+    --border:    #2a2a2a;
+    --accent:    #e8ff47;
+    --accent2:   #47d4ff;
+    --accent3:   #ff6b35;
+    --text:      #e8e8e0;
+    --muted:     #666;
+    --code-bg:   #1e1e1e;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    line-height: 1.7;
+  }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 60px 0 40px;
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    top: -60px; left: -60px;
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(232,255,71,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .header-inner {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 32px;
+  }
+  .badge {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 4px 10px;
+    margin-bottom: 24px;
+  }
+  h1 {
+    font-size: clamp(36px, 6vw, 64px);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+  }
+  h1 span { color: var(--accent); }
+  .subtitle {
+    font-size: 18px;
+    color: var(--muted);
+    max-width: 520px;
+  }
+
+  /* ── LAYOUT ── */
+  .wrapper {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 32px 80px;
+  }
+
+  /* ── TOC ── */
+  .toc {
+    margin: 48px 0;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    padding: 28px 32px;
+  }
+  .toc-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+  .toc ol {
+    list-style: none;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 32px;
+  }
+  .toc ol li { counter-increment: toc; }
+  .toc ol li::before {
+    content: counter(toc, decimal-leading-zero) " ";
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    margin-right: 6px;
+  }
+  .toc ol { counter-reset: toc; }
+  .toc a {
+    color: var(--text);
+    text-decoration: none;
+    font-size: 14px;
+    transition: color 0.2s;
+  }
+  .toc a:hover { color: var(--accent); }
+
+  /* ── SECTIONS ── */
+  section {
+    margin-top: 64px;
+    padding-top: 64px;
+    border-top: 1px solid var(--border);
+  }
+  section:first-of-type { border-top: none; margin-top: 0; }
+
+  .section-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  h2 {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    margin-bottom: 20px;
+    line-height: 1.2;
+  }
+  h3 {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 32px 0 12px;
+    color: var(--accent2);
+  }
+  p { margin-bottom: 14px; color: #c8c8c0; }
+
+  /* ── CALLOUT BOXES ── */
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    padding: 16px 20px;
+    margin: 20px 0;
+    font-size: 14px;
+  }
+  .callout.warn { border-color: var(--accent3); }
+  .callout.info { border-color: var(--accent2); }
+  .callout strong { display: block; margin-bottom: 4px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .callout.warn strong { color: var(--accent3); }
+  .callout.info strong { color: var(--accent2); }
+  .callout.tip strong { color: var(--accent); }
+
+  /* ── CODE ── */
+  code {
+    font-family: 'IBM Plex Mono', monospace;
+    background: var(--code-bg);
+    color: var(--accent);
+    padding: 2px 7px;
+    font-size: 13px;
+    border-radius: 2px;
+  }
+  pre {
+    font-family: 'IBM Plex Mono', monospace;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    padding: 20px 24px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.8;
+    margin: 16px 0;
+    position: relative;
+  }
+  pre .comment { color: #555; }
+  pre .cmd     { color: var(--accent); }
+  pre .note    { color: var(--accent2); }
+
+  /* ── COMMAND REFERENCE TABLE ── */
+  .cmd-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 14px;
+  }
+  .cmd-table th {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .cmd-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .cmd-table tr:last-child td { border-bottom: none; }
+  .cmd-table tr:hover td { background: var(--surface); }
+  .cmd-table td:first-child {
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--accent);
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .cmd-table td:last-child { color: #a0a098; font-size: 13px; }
+  .tag {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 2px 7px;
+    letter-spacing: 0.05em;
+    border-radius: 2px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .tag.push { background: rgba(255,107,53,0.15); color: var(--accent3); }
+  .tag.pull { background: rgba(71,212,255,0.12); color: var(--accent2); }
+  .tag.info { background: rgba(232,255,71,0.1); color: var(--accent); }
+
+  /* ── FLOW DIAGRAM ── */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: 28px 0;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .flow-node {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 12px 20px;
+    font-size: 13px;
+    font-family: 'IBM Plex Mono', monospace;
+    text-align: center;
+    min-width: 120px;
+  }
+  .flow-node.highlight { border-color: var(--accent); color: var(--accent); }
+  .flow-node.cloud     { border-color: var(--accent2); color: var(--accent2); }
+  .flow-arrow {
+    color: var(--border);
+    font-size: 20px;
+    padding: 0 4px;
+    user-select: none;
+  }
+
+  /* ── STEPS ── */
+  .steps { list-style: none; counter-reset: steps; margin: 16px 0; }
+  .steps li {
+    counter-increment: steps;
+    padding: 16px 0 16px 48px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    font-size: 15px;
+    color: #c8c8c0;
+  }
+  .steps li:last-child { border-bottom: none; }
+  .steps li::before {
+    content: counter(steps);
+    position: absolute;
+    left: 0;
+    top: 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    background: rgba(232,255,71,0.08);
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid rgba(232,255,71,0.2);
+  }
+
+  /* ── FOLDER TREE ── */
+  .tree {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    line-height: 2;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    padding: 20px 24px;
+    margin: 16px 0;
+  }
+  .tree .folder { color: var(--accent2); }
+  .tree .file   { color: #c8c8c0; }
+  .tree .note   { color: var(--muted); margin-left: 8px; }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 32px;
+    text-align: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  @media (max-width: 600px) {
+    .toc ol { grid-template-columns: 1fr; }
+    .flow { flex-direction: column; }
+    .flow-arrow { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="badge">Internal Team Doc · v5</div>
+    <h1>NRR Cloud<br><span>Studio Manual</span></h1>
+    <p class="subtitle">How to set up, use, and stay in sync with the shared cloud workstation.</p>
+  </div>
+</header>
+
+<div class="wrapper">
+
+  <nav class="toc">
+    <div class="toc-title">Contents</div>
+    <ol>
+      <li><a href="#overview">System Overview</a></li>
+      <li><a href="#setup">First-Time Setup</a></li>
+      <li><a href="#structure">Folder Structure</a></li>
+      <li><a href="#commands">Command Reference</a></li>
+      <li><a href="#workflows">Daily Workflows</a></li>
+      <li><a href="#rules">Team Rules</a></li>
+      <li><a href="#troubleshooting">Troubleshooting</a></li>
+      <li><a href="#faq">FAQ</a></li>
+    </ol>
+  </nav>
+
+  <!-- ── OVERVIEW ── -->
+  <section id="overview">
+    <div class="section-label">01 — Overview</div>
+    <h2>How the system works</h2>
+    <p>NRR Studio runs on a central VPS that holds all shared project files, Blender builds, and asset libraries. Each team member connects to it through a cloud workstation (VNC desktop) that is bootstrapped automatically. Files sync between your local workspace and the VPS using <strong>rclone</strong> over a private SSH connection.</p>
+
+    <div class="flow">
+      <div class="flow-node">Your VNC<br>Desktop</div>
+      <div class="flow-arrow">⟷</div>
+      <div class="flow-node highlight">~/studio/<br>PROJECTS</div>
+      <div class="flow-arrow">⟷</div>
+      <div class="flow-node cloud">VPS<br>/PROJECTS</div>
+      <div class="flow-arrow">⟷</div>
+      <div class="flow-node">Teammates'<br>Desktops</div>
+    </div>
+
+    <div class="callout info">
+      <strong>Key concept</strong>
+      Your <code>~/studio/</code> folder is your local workspace. The VPS is the shared source of truth. Syncing is <em>not automatic on pull</em> — you control when you fetch new work.
+    </div>
+
+    <h3>Auto-sync</h3>
+    <p>Your PROJECTS folder pushes to the VPS automatically every <strong>5 minutes</strong> in the background. You don't need to do anything for your saves to reach the server — but you do need to manually pull to receive other people's changes.</p>
+  </section>
+
+  <!-- ── SETUP ── -->
+  <section id="setup">
+    <div class="section-label">02 — Setup</div>
+    <h2>First-time setup</h2>
+    <p>You only need to run this once per machine or new VNC session. Ask the team lead for your <code>VPS_SSH_KEY_B64</code> value before starting.</p>
+
+    <ol class="steps">
+      <li>Open a terminal inside the VNC desktop.</li>
+      <li>Export your SSH key (provided by the team lead — keep this private):
+        <pre><span class="cmd">export VPS_SSH_KEY_B64="paste_your_key_here"</span></pre>
+      </li>
+      <li>Run the bootstrap script:
+        <pre><span class="cmd">curl -fsSL https://raw.githubusercontent.com/YOUR_REPO/bootstrap.sh | bash</span></pre>
+      </li>
+      <li>Wait for it to finish. It will download all project files, set up Blender, and register all aliases. This can take several minutes depending on project size.</li>
+      <li>Reload your shell so aliases are available:
+        <pre><span class="cmd">source ~/.bashrc</span></pre>
+      </li>
+      <li>Launch Blender from the Desktop shortcut <strong>or</strong> type <code>studio-open</code> in the terminal.</li>
+    </ol>
+
+    <div class="callout warn">
+      <strong>Important</strong>
+      Never share your <code>VPS_SSH_KEY_B64</code> in chat, email, or commits. Treat it like a password.
+    </div>
+  </section>
+
+  <!-- ── STRUCTURE ── -->
+  <section id="structure">
+    <div class="section-label">03 — Folder Structure</div>
+    <h2>What lives where</h2>
+
+    <div class="tree">
+      <span class="folder">~/studio/</span><br>
+      <span class="folder">├── PROJECTS/</span>         <span class="note">← your working files (synced every 5 min)</span><br>
+      <span class="folder">│   ├── my_scene/</span><br>
+      <span class="folder">│   └── client_render/</span><br>
+      <span class="folder">├── LIBRARY_GLOBAL/</span>   <span class="note">← shared assets, HDRIs, materials (read-heavy)</span><br>
+      <span class="folder">├── BLENDER_APPS/</span>     <span class="note">← Blender install (do not edit)</span><br>
+      <span class="folder">│   └── blender-app/</span>  <span class="note">← extracted Blender 4.5.7 binary</span><br>
+      <span class="folder">└── CONFIG_MASTER/</span>    <span class="note">← shared startup files, preferences, keymaps</span><br>
+    </div>
+
+    <div class="callout tip">
+      <strong>Rule of thumb</strong>
+      Save everything you want synced inside <code>~/studio/PROJECTS/</code>. Files saved anywhere else will not reach the VPS.
+    </div>
+  </section>
+
+  <!-- ── COMMANDS ── -->
+  <section id="commands">
+    <div class="section-label">04 — Commands</div>
+    <h2>Command reference</h2>
+    <p>All commands are available in any terminal after running the bootstrap. Type them as-is — no extra arguments needed unless noted.</p>
+
+    <table class="cmd-table">
+      <thead>
+        <tr>
+          <th>Command</th>
+          <th>What it does</th>
+          <th>Direction</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>studio-pull</td>
+          <td>Pulls PROJECTS, LIBRARY_GLOBAL, and CONFIG_MASTER from VPS. Use this when starting a new session or when a teammate has uploaded new work.</td>
+          <td><span class="tag pull">← VPS</span></td>
+        </tr>
+        <tr>
+          <td>studio-pull-projects</td>
+          <td>Pulls PROJECTS only — skips library and config. Faster. Use this when you know only project files have changed.</td>
+          <td><span class="tag pull">← VPS</span></td>
+        </tr>
+        <tr>
+          <td>studio-push</td>
+          <td>Immediately pushes your entire PROJECTS folder to the VPS. Useful after finishing a major save you want teammates to access right away instead of waiting for the 5-min cron.</td>
+          <td><span class="tag push">→ VPS</span></td>
+        </tr>
+        <tr>
+          <td>studio-push-folder</td>
+          <td>Push a single named project folder. Takes one argument: the folder name inside PROJECTS.
+            <pre style="margin-top:8px"><span class="cmd">studio-push-folder my_scene</span></pre>
+          </td>
+          <td><span class="tag push">→ VPS</span></td>
+        </tr>
+        <tr>
+          <td>studio-sync</td>
+          <td>Runs a full pull (all folders) followed by a push. Use when you want to both receive latest changes and immediately publish your own.</td>
+          <td><span class="tag pull">← VPS</span> <span class="tag push">→ VPS</span></td>
+        </tr>
+        <tr>
+          <td>studio-status</td>
+          <td>Shows files that differ between your local PROJECTS and the VPS. Read-only — makes no changes. Use this to check before pulling if you're unsure what changed.</td>
+          <td><span class="tag info">check</span></td>
+        </tr>
+        <tr>
+          <td>studio-ls</td>
+          <td>Lists all files currently in the VPS PROJECTS folder with sizes. Good for confirming a file was actually uploaded.</td>
+          <td><span class="tag info">read</span></td>
+        </tr>
+        <tr>
+          <td>studio-log</td>
+          <td>Streams the live sync log. Shows cron syncs, errors, and timestamps. Press <code>Ctrl+C</code> to exit.</td>
+          <td><span class="tag info">log</span></td>
+        </tr>
+        <tr>
+          <td>studio-open</td>
+          <td>Launches Blender 4.5.7 in the background.</td>
+          <td><span class="tag info">app</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ── WORKFLOWS ── -->
+  <section id="workflows">
+    <div class="section-label">05 — Workflows</div>
+    <h2>Daily workflows</h2>
+
+    <h3>Starting a session</h3>
+    <ol class="steps">
+      <li>Open terminal in VNC.</li>
+      <li>Pull the latest work from VPS: <code>studio-pull</code></li>
+      <li>Launch Blender: <code>studio-open</code></li>
+      <li>Work normally. Your saves auto-push every 5 minutes.</li>
+    </ol>
+
+    <h3>Fetching a specific file a teammate uploaded</h3>
+    <ol class="steps">
+      <li>Ask your teammate to confirm the upload is done (or check with <code>studio-ls</code>).</li>
+      <li>Run <code>studio-pull-projects</code> to bring it in quickly.</li>
+      <li>Your file will appear in <code>~/studio/PROJECTS/</code>.</li>
+    </ol>
+
+    <h3>Finishing a session and handing off to a teammate</h3>
+    <ol class="steps">
+      <li>Save your blend file inside <code>~/studio/PROJECTS/your_folder/</code>.</li>
+      <li>Force-push immediately so they don't have to wait: <code>studio-push</code></li>
+      <li>Tell your teammate to run <code>studio-pull-projects</code>.</li>
+    </ol>
+
+    <h3>Uploading a packed .blend from your local machine to the VPS</h3>
+    <p>If you have prepared a packed file offline and need to get it into the system:</p>
+    <ol class="steps">
+      <li>Copy your <code>.blend</code> file into the correct folder under <code>~/studio/PROJECTS/</code> on the VNC desktop (via the VNC file transfer panel or another terminal).</li>
+      <li>Push it up immediately: <code>studio-push-folder your_project_folder</code></li>
+      <li>Confirm it landed: <code>studio-ls</code></li>
+    </ol>
+
+    <div class="callout warn">
+      <strong>Avoid conflicts</strong>
+      Do not have two people working on the same <code>.blend</code> file at the same time. Rclone is a last-write-wins system — whoever pushes last overwrites the other. Coordinate before working on the same file.
+    </div>
+  </section>
+
+  <!-- ── RULES ── -->
+  <section id="rules">
+    <div class="section-label">06 — Team Rules</div>
+    <h2>Rules for the whole team</h2>
+
+    <h3>Always save inside ~/studio/PROJECTS/</h3>
+    <p>Files saved anywhere else on the VNC desktop are local only and will be lost when the session resets. If Blender asks where to save, navigate to <code>~/studio/PROJECTS/</code>.</p>
+
+    <h3>Use a subfolder per project or per person</h3>
+    <p>Don't dump files directly into the root of PROJECTS. Create a folder like <code>PROJECTS/renders_john/</code> or <code>PROJECTS/client_abc/</code> to keep things clean and avoid overwriting each other's work.</p>
+
+    <h3>Communicate before pushing a major change</h3>
+    <p>The cron job syncs every 5 minutes. If you're about to push something large (a fully packed scene, new library, etc.), give the team a heads up so they know to pull before opening those files.</p>
+
+    <h3>Don't edit LIBRARY_GLOBAL or CONFIG_MASTER manually</h3>
+    <p>These are shared by everyone. Changes there affect the whole team. Talk to the team lead before modifying anything in those folders.</p>
+
+    <h3>Pack your blend files before uploading for handoff</h3>
+    <p>If you're handing a file to someone else or archiving it, use Blender's <strong>File → External Data → Pack All Into .blend</strong> so all textures and assets travel with it. This prevents broken paths on the receiving end.</p>
+  </section>
+
+  <!-- ── TROUBLESHOOTING ── -->
+  <section id="troubleshooting">
+    <div class="section-label">07 — Troubleshooting</div>
+    <h2>Common issues</h2>
+
+    <h3>Commands not found after bootstrap</h3>
+    <p>The aliases live in <code>~/.bashrc</code> but only load for new shell sessions. Fix it by running:</p>
+    <pre><span class="cmd">source ~/.bashrc</span></pre>
+
+    <h3>rclone says "connection refused" or "ssh: handshake failed"</h3>
+    <p>Your SSH key may have been reset or the session is stale. Re-run the bootstrap with the correct <code>VPS_SSH_KEY_B64</code> to re-write the key and reconnect.</p>
+
+    <h3>studio-status shows files that "differ" but you haven't changed them</h3>
+    <p>This usually means timestamps differ without content changes — rclone uses checksums when it can, but SFTP falls back to size+time. It's safe to push — rclone will only transfer files that actually need updating.</p>
+
+    <h3>Blender can't find textures after pulling a file</h3>
+    <p>The file was likely not packed before upload. Ask the original author to re-pack and push, or manually redirect missing paths using Blender's <strong>File → External Data → Find Missing Files</strong> pointed at <code>~/studio/LIBRARY_GLOBAL/</code>.</p>
+
+    <h3>A file I pushed isn't showing on the VPS</h3>
+    <pre><span class="comment"># Check if it exists locally first</span>
+<span class="cmd">ls ~/studio/PROJECTS/your_folder/</span>
+
+<span class="comment"># Then confirm VPS received it</span>
+<span class="cmd">studio-ls</span>
+
+<span class="comment"># If it's still missing, force push manually</span>
+<span class="cmd">studio-push</span></pre>
+
+    <h3>The log shows errors</h3>
+    <pre><span class="cmd">studio-log</span>
+<span class="comment"># Press Ctrl+C to stop tailing</span></pre>
+    <p>Look for lines starting with <code>ERROR</code>. Most errors are network timeouts — they will retry on the next cron cycle automatically.</p>
+  </section>
+
+  <!-- ── FAQ ── -->
+  <section id="faq">
+    <div class="section-label">08 — FAQ</div>
+    <h2>Frequently asked questions</h2>
+
+    <h3>Do I need to push manually? Won't the cron do it?</h3>
+    <p>The cron pushes every 5 minutes, so for normal working it handles everything. Manual <code>studio-push</code> is only for when you need a teammate to have your files right now — for example, handing off to the next person in a render pipeline.</p>
+
+    <h3>What happens if I forget to pull before working?</h3>
+    <p>Your work won't be lost, but you may overwrite a teammate's newer version when you push. Always run <code>studio-pull-projects</code> at the start of a session to stay safe.</p>
+
+    <h3>Can I use Blender's own auto-save?</h3>
+    <p>Yes. Blender's auto-save creates temp files in its own temp directory. Just make sure your real saves go into <code>~/studio/PROJECTS/</code> so they reach the VPS.</p>
+
+    <h3>Will my work survive a VNC session reset?</h3>
+    <p>Yes — as long as you saved inside <code>~/studio/PROJECTS/</code> and it had time to push (within 5 minutes). After a session reset, just run <code>studio-pull-projects</code> and your files will come back from the VPS.</p>
+
+    <h3>How do I check what version of Blender I'm running?</h3>
+    <pre><span class="cmd">~/studio/BLENDER_APPS/blender-app/blender --version</span></pre>
+
+    <h3>How do I add a new asset to LIBRARY_GLOBAL?</h3>
+    <p>Talk to the team lead. Library changes affect everyone, so they go through a single gatekeeper to prevent conflicts.</p>
+  </section>
+
+</div>
+
+<footer>
+  NRR Cloud Studio — Internal Documentation &nbsp;·&nbsp; Keep this private &nbsp;·&nbsp; v5
+</footer>
+
+</body>
+</html>
