@@ -55,7 +55,7 @@ You only need to run this once per machine or new VNC session. Ask the team lead
     ```
 3.  **Run the bootstrap script**:
     ```bash
-    curl -fsSL https://raw.githubusercontent.com/YOUR_REPO/bootstrap.sh | bash
+    curl -fsSL https://raw.githubusercontent.com/nrr-studio/bootstrap.sh | bash
     ```
 4.  **Wait for it to finish.** It will download all project files, set up Blender, and register all aliases.
 5.  **Reload your shell** so aliases are available:
