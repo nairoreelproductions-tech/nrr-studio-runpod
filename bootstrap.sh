@@ -67,36 +67,36 @@ mkdir -p "$STUDIO_ROOT/PROJECTS" \
          "$STUDIO_ROOT/LIBRARY_GLOBAL" \
          "$STUDIO_ROOT/CONFIG_MASTER"
 
-#rclone copy vps:/PROJECTS       "$STUDIO_ROOT/PROJECTS"       --transfers=8  --stats=10s
-#rclone copy vps:/BLENDER_APPS   "$STUDIO_ROOT/BLENDER_APPS"   --transfers=4  --stats=10s
-#rclone copy vps:/LIBRARY_GLOBAL "$STUDIO_ROOT/LIBRARY_GLOBAL" --transfers=16 --stats=10s
+rclone copy vps:/PROJECTS       "$STUDIO_ROOT/PROJECTS"       --transfers=8  --stats=10s
+rclone copy vps:/BLENDER_APPS   "$STUDIO_ROOT/BLENDER_APPS"   --transfers=4  --stats=10s
+rclone copy vps:/LIBRARY_GLOBAL "$STUDIO_ROOT/LIBRARY_GLOBAL" --transfers=16 --stats=10s
 rclone copy vps:/CONFIG_MASTER  "$STUDIO_ROOT/CONFIG_MASTER"  --transfers=4  --stats=10s
 
 # ── SECTION 5: Blender 4.5.7 Setup ───────────────────────────
-#log "Setting up Blender..."
-#BLENDER_TAR=$(ls "$STUDIO_ROOT/BLENDER_APPS/blender-4.5.7"*.tar.xz 2>/dev/null | head -1 || true)
+log "Setting up Blender..."
+BLENDER_TAR=$(ls "$STUDIO_ROOT/BLENDER_APPS/blender-4.5.7"*.tar.xz 2>/dev/null | head -1 || true)
 
-#if [ -n "$BLENDER_TAR" ]; then
-   # if [ ! -d "$STUDIO_ROOT/BLENDER_APPS/blender-app" ]; then
-       # log "Extracting $BLENDER_TAR..."
-       # tar -xf "$BLENDER_TAR" -C "$STUDIO_ROOT/BLENDER_APPS/"
-       # EXTRACTED_DIR=$(ls -d "$STUDIO_ROOT/BLENDER_APPS/blender-4.5.7"*linux* 2>/dev/null | head -1)
-       # mv "$EXTRACTED_DIR" "$STUDIO_ROOT/BLENDER_APPS/blender-app"
-   # fi
+if [ -n "$BLENDER_TAR" ]; then
+    if [ ! -d "$STUDIO_ROOT/BLENDER_APPS/blender-app" ]; then
+        log "Extracting $BLENDER_TAR..."
+        tar -xf "$BLENDER_TAR" -C "$STUDIO_ROOT/BLENDER_APPS/"
+        EXTRACTED_DIR=$(ls -d "$STUDIO_ROOT/BLENDER_APPS/blender-4.5.7"*linux* 2>/dev/null | head -1)
+        mv "$EXTRACTED_DIR" "$STUDIO_ROOT/BLENDER_APPS/blender-app"
+    fi
 
-   # cat > "$DESKTOP_DIR/Blender-Studio.desktop" << EOF
-#[Desktop Entry]
-#Name=Blender 4.5.7 (Studio)
-#Exec=$STUDIO_ROOT/BLENDER_APPS/blender-app/blender %f
-#Icon=$STUDIO_ROOT/BLENDER_APPS/blender-app/blender.svg
-#Type=Application
-#Terminal=false
-#EOF
-    #chmod +x "$DESKTOP_DIR/Blender-Studio.desktop"
-    #log "Blender shortcut created."
-#else
-    #log "WARNING: No blender-4.5.7 tar.xz found in BLENDER_APPS. Skipping."
-#fi
+    cat > "$DESKTOP_DIR/Blender-Studio.desktop" << EOF
+[Desktop Entry]
+Name=Blender 4.5.7 (Studio)
+Exec=$STUDIO_ROOT/BLENDER_APPS/blender-app/blender %f
+Icon=$STUDIO_ROOT/BLENDER_APPS/blender-app/blender.svg
+Type=Application
+Terminal=false
+EOF
+    chmod +x "$DESKTOP_DIR/Blender-Studio.desktop"
+    log "Blender shortcut created."
+else
+    log "WARNING: No blender-4.5.7 tar.xz found in BLENDER_APPS. Skipping."
+fi
 
 # ── SECTION 6: Cron Sync Back to VPS ─────────────────────────
 # Sync uses same relative path. Runs as user, uses user's rclone config.
